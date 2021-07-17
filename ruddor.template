@@ -1,0 +1,292 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+metadata:
+  name: ruddor
+  namespace: ruddor
+  annotations:
+    description: >-
+      This template is used for setup ruddor Services on your cluster, a
+      mysql database service should be ready before installing.
+    iconClass: icon-docker
+    openshift.io/display-name: ruddor
+    openshift.io/documentation-url: 'https://ruddor.io/'
+    openshift.io/long-description: >-
+      This template provides a ruddor management portal for your cluster.
+      After a successful installation, you can access portal via
+      https://portal.<route-subdomain>, and make sure you have a right dns
+      resolution.
+    openshift.io/provider-display-name: 'Red Hat, Inc.'
+    openshift.io/support-url: 'https://access.redhat.com'
+    tags: ruddor
+message: >-
+  The following service(s) have been created in your project: ruddor web
+  service Deployment ruddor core service Deployment routes 
+objects:
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      creationTimestamp: null
+      name: ruddor-web
+    spec:
+      ports:
+        - name: web
+          port: 8080
+          protocol: TCP
+          targetPort: 80
+      selector:
+        app: ruddor-web
+      sessionAffinity: None
+      type: ClusterIP
+    status:
+      loadBalancer: {}
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      creationTimestamp: null
+      name: ruddor-server
+    spec:
+      ports:
+        - name: web
+          port: 8080
+          protocol: TCP
+          targetPort: 8080
+        - name: proxy
+          port: 443
+          protocol: TCP
+          targetPort: 8443
+      selector:
+        app: ruddor-server
+      sessionAffinity: None
+      type: ClusterIP
+    status:
+      loadBalancer: {}
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: ruddor-server
+      name: ruddor-server
+    spec:
+      progressDeadlineSeconds: 600
+      replicas: 1
+      revisionHistoryLimit: 10
+      selector:
+        matchLabels:
+          app: ruddor-server
+      strategy:
+        rollingUpdate:
+          maxSurge: 25%
+          maxUnavailable: 25%
+        type: RollingUpdate
+      template:
+        metadata:
+          creationTimestamp: null
+          labels:
+            app: ruddor-server
+        spec:
+          containers:
+            - env:
+                - name: MYSQL_HOST
+                  value: '${DATABASE_SERVICE_NAME}'
+                - name: MYSQL_PORT
+                  value: '3306'
+                - name: MYSQL_USERNAME
+                  value: '${MYSQL_USER}'
+                - name: MYSQL_PASSWORD
+                  value: '${MYSQL_PASSWORD}'
+                - name: DATABASE_NAME
+                  value: '${MYSQL_DATABASE}'
+              image: '${RUDDOR_SERVER_IMAGE}'
+              imagePullPolicy: IfNotPresent
+              name: ruddor-server
+              ports:
+                - containerPort: 8080
+                  protocol: TCP
+              resources: {}
+              securityContext:
+                capabilities: {}
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: File
+            - resources: {}
+              terminationMessagePath: /dev/termination-log
+              name: oauth-proxy
+              ports:
+                - name: public
+                  containerPort: 8443
+                  protocol: TCP
+              imagePullPolicy: IfNotPresent
+              volumeMounts:
+                - name: proxy-tls
+                  mountPath: /etc/tls/private
+              terminationMessagePolicy: File
+              image: '${OPENSHIFT_OAUTH_PROXY_IMAGE}'
+              args:
+                - '--https-address=:8443'
+                - '--provider=openshift'
+                - '--openshift-service-account=proxy'
+                - '--upstream=http://localhost:8080'
+                - '--tls-cert=/etc/tls/private/tls.crt'
+                - '--tls-key=/etc/tls/private/tls.key'
+                - '--cookie-secret=SECRET'
+                - '--skip-auth-regex=^'
+          volumes:
+            - name: proxy-tls
+              secret:
+                secretName: ruddor-server-cert
+                defaultMode: 420
+          dnsConfig: {}
+          dnsPolicy: ClusterFirst
+          restartPolicy: Always
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: default
+          serviceAccountName: default
+          terminationGracePeriodSeconds: 30
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: ruddor-web
+      name: ruddor-web
+    spec:
+      progressDeadlineSeconds: 600
+      replicas: 1
+      revisionHistoryLimit: 10
+      selector:
+        matchLabels:
+          app: ruddor-web
+      strategy:
+        rollingUpdate:
+          maxSurge: 25%
+          maxUnavailable: 25%
+        type: RollingUpdate
+      template:
+        metadata:
+          creationTimestamp: null
+          labels:
+            app: ruddor-web
+        spec:
+          containers:
+            - image: '${RUDDOR_WEB_IMAGE}'
+              imagePullPolicy: IfNotPresent
+              name: ruddor-web
+              ports:
+                - containerPort: 8080
+                  protocol: TCP
+              resources: {}
+              env:
+                - name: RUDDOR_SERVER_ADDRESS
+                  value: '${RUDDOR_SERVER_ADDRESS}'
+                - name: RUDDOR_WEB_ADDRESS
+                  value: '${RUDDOR_WEB_ADDRESS}'
+              securityContext:
+                capabilities: {}
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: File
+          dnsConfig: {}
+          dnsPolicy: ClusterFirst
+          restartPolicy: Always
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: ruddor
+          serviceAccountName: ruddor
+          terminationGracePeriodSeconds: 30
+  - apiVersion: route.openshift.io/v1
+    kind: Route
+    metadata:
+      annotations:
+        openshift.io/host.generated: 'true'
+      creationTimestamp: null
+      name: ruddor-web
+    spec:
+      host: ''
+      path: /
+      port:
+        targetPort: 80
+      tls:
+        insecureEdgeTerminationPolicy: None
+        termination: edge
+      to:
+        kind: Service
+        name: ruddor-web
+        weight: 1
+      wildcardPolicy: None
+  - apiVersion: route.openshift.io/v1
+    kind: Route
+    metadata:
+      creationTimestamp: null
+      name: ruddor-server
+    spec:
+      host: ''
+      path: /
+      port:
+        targetPort: 8080
+      tls:
+        insecureEdgeTerminationPolicy: None
+        termination: edge
+      to:
+        kind: Service
+        name: ruddor-server
+        weight: 1
+      wildcardPolicy: None
+  - apiVersion: route.openshift.io/v1
+    kind: Route
+    metadata:
+      creationTimestamp: null
+      name: ruddor-auth
+    spec:
+      host: ''
+      port:
+        targetPort: 8443
+      tls:
+        insecureEdgeTerminationPolicy: None
+        termination: passthrough
+      to:
+        kind: Service
+        name: ruddor-server
+        weight: 1
+      wildcardPolicy: None
+parameters:
+  - name: RUDDOR_WEB_IMAGE
+    displayName: Web Service Image Address
+    description: ruddor web image address
+    value: 'ccr.ccs.tencentyun.com/hyperkuber/ruddor-web:latest'
+    required: true
+  - name: RUDDOR_SERVER_IMAGE
+    displayName: Server Image
+    description: ruddor Server Service Image Address
+    value: 'ccr.ccs.tencentyun.com/hyperkuber/ruddor-server:latest'
+    required: true
+  - name: OPENSHIFT_OAUTH_PROXY_IMAGE
+    displayName: Oauth-proxy Image
+    description: OpenShift oauth-proxy sidecar image
+    value: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:9aa4c23487fab1997f6d61bb893963ebd67b1403aaa9e51091566bc87a78970e
+    required: true
+  - name: DATABASE_SERVICE_NAME
+    displayName: Database Service Name
+    description: The name of the OpenShift Service exposed for the database.
+    value: mysql
+    required: true
+  - name: MYSQL_USER
+    displayName: MySQL Connection Username
+    description: Username for MySQL user that will be used for accessing the database.
+    required: true
+  - name: MYSQL_PASSWORD
+    displayName: MySQL Connection Password
+    description: Password for the MySQL connection user.
+    required: true
+  - name: MYSQL_DATABASE
+    displayName: MySQL Database Name
+    description: Name of the MySQL database accessed.
+    value: ruddor
+    required: true
+  - name: RUDDOR_SERVER_ADDRESS
+    displayName: Ruddor server address
+    description: The route address of ruddor server application,https://ruddor-server-<ns>.<route-subdomain>
+    required: true
+  - name: RUDDOR_WEB_ADDRESS
+    displayName: Ruddor web address
+    description: The route address of ruddor web application,https://ruddor-web-<ns>.<route-subdomain>
+    required: true

@@ -1,0 +1,41 @@
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ruddor-admin-patch
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-admin: 'true'
+rules:
+  - verbs:
+      - create
+      - get
+      - list
+    apiGroups:
+      - ''
+    resources:
+      - limitranges
+      - namespaces
+      - resourcequotas
+  - verbs:
+      - get
+      - list
+      - delete
+      - update
+    apiGroups:
+      - monitoring.coreos.com
+    resources:
+      - prometheusrules
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: alert-manager-secret
+  namespace: openshift-monitoring
+rules:
+  - verbs:
+      - get
+      - patch
+    apiGroups:
+      - ''
+    resources:
+      - secrets
