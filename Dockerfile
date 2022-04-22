@@ -15,11 +15,7 @@ RUN rm /etc/rhsm-host && \
     subscription-manager repos --enable=rhel-7-server-optional-rpms && \
     yum -y update && \
     yum install xorg-x11-fonts-75dpi libjpeg libXrender libXext && \
-    # Remove entitlements and Subscription Manager configs
-    rm -rf /etc/pki/entitlement && \
-    rm -rf /etc/rhsm
-
- 
+    
 
 
 USER 185
