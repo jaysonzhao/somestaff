@@ -11,7 +11,8 @@ RUN rm /etc/rhsm-host && \
     # Initialize /etc/yum.repos.d/redhat.repo
     # See https://access.redhat.com/solutions/1443553
     yum repolist --disablerepo=* && \
-    subscription-manager repos --enable rhel-7-server-rpms rhel-7-server-extras-rpms&& \
+    subscription-manager repos --enable=rhel-7-server-rpms && \
+    subscription-manager repos --enable=rhel-7-server-extras-rpms && \
     yum -y update && \
     yum install xorg-x11-fonts-75dpi libjpeg libXrender libXext && \
     # Remove entitlements and Subscription Manager configs
