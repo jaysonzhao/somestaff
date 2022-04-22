@@ -14,7 +14,7 @@ RUN rm /etc/rhsm-host && \
     subscription-manager repos --enable=rhel-7-server-rpms && \
     subscription-manager repos --enable=rhel-7-server-optional-rpms && \
     yum -y update && \
-    yum install xorg-x11-fonts-75dpi libjpeg libXrender libXext && \
+    yum install libpng16-16
     
 
 
